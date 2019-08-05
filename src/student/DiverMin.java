@@ -1,9 +1,17 @@
 package student;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.Stack;
 
+import a4.Heap;
 import a5.GraphAlgorithms;
 import game.FindState;
 import game.FleeState;
@@ -41,8 +49,76 @@ public class DiverMin implements SewerDiver {
 	 * Some modification is necessary to make the search better, in general. */
 	@Override
 	public void find(FindState state) {
-    throw new NotImplementedError();
+		
+		HashSet<Long> Visited= new HashSet<>();
+		HashMap<Long, Long> backpointer= new HashMap<>();
+		while (state.distanceToRing() != 0) {
+			
+			Collection<NodeStatus> neighbors= state.neighbors();
+			
+			Iterator<NodeStatus> iterator= neighbors.iterator();
+			Iterator<NodeStatus> iterator2= neighbors.iterator();
+			
+			NodeStatus go= null;
+			int count= 0;
+			
+			while (iterator.hasNext()) {
+				
+				if (count == 0) {
+					NodeStatus temp= iterator.next();
+					if (!Visited.contains(temp.getId())) {
+						go= temp;
+						count++ ;
+					}
+				} else {
+					NodeStatus n= iterator.next();
+					if (!Visited.contains(n.getId())) {
+						count++ ;
+						if (n.getDistanceToTarget() < state.distanceToRing()) {
+							go= n;
+						}
+					}
+				}
+			}
+			int s_count= 0;
+			
+			for (int i= 0; i < neighbors.size(); i++ ) {
+				NodeStatus n= iterator2.next();
+				if (Visited.contains(n.getId()))
+					s_count++ ;
+			}
+			if (s_count == neighbors.size()) {
+				state.moveTo(backpointer.get(state.currentLocation()));
+			} else {
+				Visited.add(go.getId());
+				backpointer.put(go.getId(), state.currentLocation());
+				state.moveTo(go.getId());
+			}
+		}
+	}	
+	
+	/**Class for storing the current node and its backpointer.
+	 * 
+	 * @param Node the current node
+	 * @param Node1 the backpointer node
+	 */
+	private static class path<Node,Node1> {
+		Node           node;
+		path<Node,Node1>   parent;
+		int         distance;
+		boolean     settled;
+		
+		public path(Node current, path<Node,Node1> parent, int distance) {
+			this.node = current; this.parent = parent; this.distance = distance;
+		}
+		
+		public List<Node> toList() {
+			List<Node> rest = parent == null ? new ArrayList<>() : parent.toList();
+			rest.add(node);
+			return rest;
+		}
 	}
+	
 	
 	/** Flee the sewer system before the steps are all used, trying to <br>
 	 * collect as many coins as possible along the way. Your solution must ALWAYS <br>
@@ -68,9 +144,61 @@ public class DiverMin implements SewerDiver {
 	 * exit using the shortest path, although this will not collect many coins.<br>
 	 * For this reason, a good starting solution is to use the shortest path to<br>
 	 * the exit. */
+	
 	@Override
 	public void flee(FleeState state) {
-    throw new NotImplementedError();
+		shortestPath(state);
+		return;
 	}
-
+		
+	/**Helper method that uses Dijkstra's shortest path algorithm and moves DriverMin to the exit.
+	 * 
+	 */
+	private void shortestPath(FleeState state) {
+		//Shortest path part
+		List<Node> way = new ArrayList<>();
+		List<Node> worklist = new ArrayList<Node>();
+		Map<Node,path<Node,Node>> distance  = new HashMap<>();
+				
+		worklist.add(state.currentNode());
+		distance.put(state.currentNode(),new path<Node,Node>(state.currentNode(),null,0));
+				
+		int i = 0;
+		Node      current  = worklist.get(i);
+								
+		while(worklist.size() > 0) {
+					
+		current  = worklist.get(i);
+		path<Node,Node> currPath = distance.get(current);
+		currPath.settled = true;
+					worklist.remove(current);
+					
+					if (current.equals(state.getExit())) {
+						way = currPath.toList();
+						way.remove(state.currentNode());
+						for (Node n:way) {
+							state.moveTo(n);
+						}
+						return;
+					}
+					for(Node n : current.getNeighbors()) {
+						int d = currPath.distance + current.getEdge(n).label();
+						path<Node,Node> oldPath = distance.get(n);
+						if (oldPath == null) {
+							worklist.add(n);
+							distance.put(n, new path<>(n, currPath, d));
+						} else if (oldPath.settled) {
+							i = 0;
+							continue;
+						}
+						else if (d < oldPath.distance) {
+							oldPath.parent   = currPath;
+							oldPath.distance = d;
+							i = worklist.indexOf(n);
+						}
+					} 
+				}
+				return;
+	}
 }
+
